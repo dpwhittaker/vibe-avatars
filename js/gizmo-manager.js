@@ -122,10 +122,18 @@ export class GizmoManager {
             console.log('Gizmos disabled');
         }
         
-        // Update button text
+        // Update button text for both desktop and mobile
         const button = document.getElementById('toggleGizmos');
+        const mobileButton = document.getElementById('toggleGizmosMobile');
+        
+        const text = this.gizmosEnabled ? '🔧 Disable Gizmos' : '🔧 Enable Gizmos';
+        const icon = this.gizmosEnabled ? '⚙️' : '🔧';
+        
         if (button) {
-            button.textContent = this.gizmosEnabled ? 'Disable Gizmos' : 'Enable Gizmos';
+            button.textContent = text;
+        }
+        if (mobileButton) {
+            mobileButton.textContent = icon;
         }
     }
 

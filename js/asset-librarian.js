@@ -2,6 +2,7 @@ export class AssetLibrarian {
     constructor(scene) {
         this.scene = scene;
         this.loadedAssets = new Map();
+        this.spawnedAssets = [];
         this.assetCategories = {
             furniture: [],
             decorations: [],
@@ -43,6 +44,40 @@ export class AssetLibrarian {
         ];
     }
 
+    async loadAssetFromLibrary(assetName) {
+        try {
+            // Try to load from Babylon.js Asset Library via Assets namespace
+            const baseUrl = "https://models.babylonjs.com/";
+            let assetUrl = "";
+            
+            // Map asset names to their URLs in the Assets library
+            const assetMap = {
+                'table': 'Table.glb',
+                'chair': 'Chair.glb', 
+                'lamp': 'Lamp.glb',
+                'tree': 'Tree.glb',
+                'house': 'House.glb'
+            };
+            
+            assetUrl = assetMap[assetName.toLowerCase()] || `${assetName}.glb`;
+            
+            console.log(`Loading asset from Assets library: ${assetName}`);
+            
+            const result = await BABYLON.SceneLoader.ImportMeshAsync('', baseUrl, assetUrl, this.scene);
+            
+            if (result.meshes.length > 0) {
+                this.loadedAssets.set(assetName, result);
+                console.log(`Asset loaded successfully from Assets library: ${assetName}`);
+                return result;
+            }
+            
+        } catch (error) {
+            console.warn(`Asset not found in library, using primitive: ${assetName}`, error);
+        }
+        
+        return null;
+    }
+
     async loadAsset(assetPath, assetName) {
         try {
             // Check if asset already loaded
@@ -67,13 +102,39 @@ export class AssetLibrarian {
         }
     }
 
-    instantiateAsset(assetName, position = new BABYLON.Vector3(0, 0, 0)) {
-        // First try to find in loaded assets
+    async instantiateAsset(assetName, position = new BABYLON.Vector3(0, 0, 0)) {
+        // First try to load from Assets library
+        let asset = await this.loadAssetFromLibrary(assetName);
+        
+        if (asset && asset.meshes.length > 0) {
+            // Clone from library asset
+            const instance = asset.meshes[0].createInstance(assetName + '_instance_' + Date.now());
+            instance.position = position;
+            
+            // Add physics
+            const aggregate = new BABYLON.PhysicsAggregate(instance, BABYLON.PhysicsShapeType.BOX, 
+                { mass: 1, restitution: 0.3 }, this.scene);
+            instance.userData = { physicsAggregate: aggregate };
+            
+            this.spawnedAssets.push(instance);
+            this.updateUI();
+            return instance;
+        }
+        
+        // Try to find in loaded assets
         if (this.loadedAssets.has(assetName)) {
             const originalAsset = this.loadedAssets.get(assetName);
             // Clone the asset
             const instance = originalAsset.meshes[0].clone(assetName + '_instance_' + Date.now());
             instance.position = position;
+            
+            // Add physics
+            const aggregate = new BABYLON.PhysicsAggregate(instance, BABYLON.PhysicsShapeType.BOX, 
+                { mass: 1, restitution: 0.3 }, this.scene);
+            instance.userData = { physicsAggregate: aggregate };
+            
+            this.spawnedAssets.push(instance);
+            this.updateUI();
             return instance;
         }
         
@@ -82,6 +143,14 @@ export class AssetLibrarian {
         if (primitiveAsset) {
             const instance = primitiveAsset.createFunction();
             instance.position = position;
+            
+            // Add physics to primitive assets
+            const aggregate = new BABYLON.PhysicsAggregate(instance, BABYLON.PhysicsShapeType.BOX, 
+                { mass: 1, restitution: 0.3 }, this.scene);
+            instance.userData = { physicsAggregate: aggregate };
+            
+            this.spawnedAssets.push(instance);
+            this.updateUI();
             return instance;
         }
         
@@ -89,22 +158,39 @@ export class AssetLibrarian {
         return null;
     }
 
-    loadRandomAsset() {
+    async loadRandomAsset() {
         // Load a random primitive asset for demonstration
         const randomAsset = this.primitiveAssets[Math.floor(Math.random() * this.primitiveAssets.length)];
         
         const position = new BABYLON.Vector3(
             Math.random() * 10 - 5,
-            0,
+            2, // Start higher to let physics settle
             Math.random() * 10 - 5
         );
         
-        const instance = this.instantiateAsset(randomAsset.name, position);
+        const instance = await this.instantiateAsset(randomAsset.name, position);
         if (instance) {
             console.log(`Spawned ${randomAsset.name} at`, position);
         }
         
         return instance;
+    }
+    
+    updateUI() {
+        if (document.getElementById('objectCount')) {
+            document.getElementById('objectCount').textContent = this.spawnedAssets.length;
+        }
+    }
+    
+    clearAssets() {
+        this.spawnedAssets.forEach(asset => {
+            if (asset.userData && asset.userData.physicsAggregate) {
+                asset.userData.physicsAggregate.dispose();
+            }
+            asset.dispose();
+        });
+        this.spawnedAssets = [];
+        this.updateUI();
     }
 
     // Primitive asset creation functions

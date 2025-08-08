@@ -4,6 +4,7 @@ export class CharacterController {
         this.avatars = [];
         this.selectedAvatar = null;
         this.inputMap = {};
+        this.keys = {};
         this.setupInput();
     }
 
@@ -13,9 +14,11 @@ export class CharacterController {
             switch (kbInfo.type) {
                 case BABYLON.KeyboardEventTypes.KEYDOWN:
                     this.inputMap[kbInfo.event.code] = true;
+                    this.keys[kbInfo.event.key.toLowerCase()] = true;
                     break;
                 case BABYLON.KeyboardEventTypes.KEYUP:
                     this.inputMap[kbInfo.event.code] = false;
+                    this.keys[kbInfo.event.key.toLowerCase()] = false;
                     break;
             }
         });
@@ -25,9 +28,82 @@ export class CharacterController {
             this.updateMovement();
         });
     }
+    
+    handleKeyDown(key) {
+        this.keys[key] = true;
+        if (key === 'w') this.inputMap['KeyW'] = true;
+        if (key === 'a') this.inputMap['KeyA'] = true;
+        if (key === 's') this.inputMap['KeyS'] = true;
+        if (key === 'd') this.inputMap['KeyD'] = true;
+        if (key === ' ') this.inputMap['Space'] = true;
+    }
+    
+    handleKeyUp(key) {
+        this.keys[key] = false;
+        if (key === 'w') this.inputMap['KeyW'] = false;
+        if (key === 'a') this.inputMap['KeyA'] = false;
+        if (key === 's') this.inputMap['KeyS'] = false;
+        if (key === 'd') this.inputMap['KeyD'] = false;
+        if (key === ' ') this.inputMap['Space'] = false;
+    }
 
-    spawnAvatar() {
-        // Create a simple avatar (capsule for now)
+    async spawnAvatar() {
+        try {
+            // Import HVGirl from Babylon.js asset library
+            const result = await BABYLON.SceneLoader.ImportMeshAsync("", "https://models.babylonjs.com/", "HVGirl.glb", this.scene);
+            
+            if (result.meshes.length === 0) {
+                console.warn("HVGirl not found, creating simple avatar");
+                return this.createSimpleAvatar();
+            }
+            
+            const avatar = result.meshes[0];
+            avatar.name = 'HVGirl_' + this.avatars.length;
+            
+            // Position avatar at random location
+            avatar.position = new BABYLON.Vector3(
+                Math.random() * 10 - 5,
+                0,
+                Math.random() * 10 - 5
+            );
+            
+            // Scale down if needed
+            avatar.scaling = new BABYLON.Vector3(1, 1, 1);
+            
+            // Add physics impostor for character controller
+            const avatarAggregate = new BABYLON.PhysicsAggregate(avatar, BABYLON.PhysicsShapeType.CAPSULE, 
+                { mass: 1, restitution: 0.1 }, this.scene);
+            
+            // Add custom properties
+            avatar.userData = {
+                type: 'avatar',
+                speed: 5,
+                jumpForce: 10,
+                physicsAggregate: avatarAggregate
+            };
+
+            // Make it selectable
+            avatar.actionManager = new BABYLON.ActionManager(this.scene);
+            avatar.actionManager.registerAction(new BABYLON.ExecuteCodeAction(
+                BABYLON.ActionManager.OnPickTrigger, 
+                () => this.selectAvatar(avatar)
+            ));
+
+            this.avatars.push(avatar);
+            this.selectAvatar(avatar);
+            this.updateUI();
+
+            console.log('HVGirl avatar spawned at', avatar.position);
+            return avatar;
+            
+        } catch (error) {
+            console.warn("Error loading HVGirl, creating simple avatar:", error);
+            return this.createSimpleAvatar();
+        }
+    }
+    
+    createSimpleAvatar() {
+        // Fallback simple avatar
         const avatar = BABYLON.MeshBuilder.CreateCapsule('avatar', {
             radius: 0.5,
             height: 2
@@ -49,16 +125,16 @@ export class CharacterController {
         );
         avatar.material = material;
 
-        // Physics disabled for now - can be enabled with physics engine
-        // avatar.physicsImpostor = new BABYLON.PhysicsImpostor(avatar, 
-        //     BABYLON.PhysicsImpostor.CapsuleImpostor, 
-        //     { mass: 1, restitution: 0.1 }, this.scene);
+        // Add physics impostor
+        const avatarAggregate = new BABYLON.PhysicsAggregate(avatar, BABYLON.PhysicsShapeType.CAPSULE, 
+            { mass: 1, restitution: 0.1 }, this.scene);
 
         // Add custom properties
         avatar.userData = {
             type: 'avatar',
             speed: 5,
-            jumpForce: 10
+            jumpForce: 10,
+            physicsAggregate: avatarAggregate
         };
 
         // Make it selectable
@@ -70,8 +146,9 @@ export class CharacterController {
 
         this.avatars.push(avatar);
         this.selectAvatar(avatar);
+        this.updateUI();
 
-        console.log('Avatar spawned at', avatar.position);
+        console.log('Simple avatar spawned at', avatar.position);
         return avatar;
     }
 
@@ -99,7 +176,8 @@ export class CharacterController {
         outline.parent = avatar;
         
         avatar.userData.outline = outline;
-
+        
+        this.updateUI();
         console.log('Avatar selected');
     }
 
@@ -126,15 +204,48 @@ export class CharacterController {
             movement.x += speed * deltaTime;
         }
 
-        // Apply movement
-        if (movement.length() > 0) {
-            avatar.position.addInPlace(movement);
+        // Apply movement using physics
+        if (movement.length() > 0 && avatar.userData.physicsAggregate) {
+            const body = avatar.userData.physicsAggregate.body;
+            const velocity = body.getLinearVelocity();
+            velocity.x = movement.x * 5; // Scale for physics
+            velocity.z = movement.z * 5;
+            body.setLinearVelocity(velocity);
         }
 
-        // Jump (simplified without physics)
-        if (this.inputMap['Space']) {
-            movement.y += speed * deltaTime * 2; // Simple jump movement
+        // Jump
+        if (this.inputMap['Space'] && avatar.userData.physicsAggregate) {
+            const body = avatar.userData.physicsAggregate.body;
+            const velocity = body.getLinearVelocity();
+            if (Math.abs(velocity.y) < 0.1) { // Only jump if not already jumping
+                velocity.y = avatar.userData.jumpForce;
+                body.setLinearVelocity(velocity);
+            }
         }
+    }
+    
+    updateUI() {
+        if (document.getElementById('avatarCount')) {
+            document.getElementById('avatarCount').textContent = this.avatars.length;
+        }
+        if (document.getElementById('selectedInfo')) {
+            document.getElementById('selectedInfo').textContent = this.selectedAvatar ? 'Avatar' : 'None';
+        }
+    }
+
+    clearAvatars() {
+        this.avatars.forEach(avatar => {
+            if (avatar.userData && avatar.userData.outline) {
+                avatar.userData.outline.dispose();
+            }
+            if (avatar.userData && avatar.userData.physicsAggregate) {
+                avatar.userData.physicsAggregate.dispose();
+            }
+            avatar.dispose();
+        });
+        this.avatars = [];
+        this.selectedAvatar = null;
+        this.updateUI();
     }
 
     getSelectedAvatar() {
@@ -152,7 +263,14 @@ export class CharacterController {
             if (this.selectedAvatar === avatar) {
                 this.selectedAvatar = null;
             }
+            if (avatar.userData && avatar.userData.outline) {
+                avatar.userData.outline.dispose();
+            }
+            if (avatar.userData && avatar.userData.physicsAggregate) {
+                avatar.userData.physicsAggregate.dispose();
+            }
             avatar.dispose();
+            this.updateUI();
         }
     }
 }

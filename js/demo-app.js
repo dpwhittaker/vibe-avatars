@@ -33,11 +33,17 @@ class VibeAvatarsDemo {
     }
 
     setupEventListeners() {
-        // UI button handlers
+        // UI button handlers - desktop
         document.getElementById('spawnAvatar').addEventListener('click', () => this.spawnAvatar());
         document.getElementById('toggleGizmos').addEventListener('click', () => this.toggleGizmos());
         document.getElementById('loadAsset').addEventListener('click', () => this.loadRandomAsset());
         document.getElementById('clearScene').addEventListener('click', () => this.clearScene());
+        
+        // UI button handlers - mobile toolbar
+        document.getElementById('spawnAvatarMobile').addEventListener('click', () => this.spawnAvatar());
+        document.getElementById('toggleGizmosMobile').addEventListener('click', () => this.toggleGizmos());
+        document.getElementById('loadAssetMobile').addEventListener('click', () => this.loadRandomAsset());
+        document.getElementById('clearSceneMobile').addEventListener('click', () => this.clearScene());
 
         // Mouse events for object interaction
         this.scene.addEventListener('mousedown', (e) => this.onMouseDown(e));
@@ -341,7 +347,14 @@ class VibeAvatarsDemo {
     toggleGizmos() {
         this.gizmosEnabled = !this.gizmosEnabled;
         const button = document.getElementById('toggleGizmos');
-        button.textContent = this.gizmosEnabled ? '🔧 Disable Gizmos' : '🔧 Enable Gizmos';
+        const mobileButton = document.getElementById('toggleGizmosMobile');
+        
+        const text = this.gizmosEnabled ? '🔧 Disable Gizmos' : '🔧 Enable Gizmos';
+        const icon = this.gizmosEnabled ? '⚙️' : '🔧';
+        
+        button.textContent = text;
+        mobileButton.textContent = icon;
+        
         console.log('Gizmos', this.gizmosEnabled ? 'enabled' : 'disabled');
     }
 
