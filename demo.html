@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibe Avatars - 3D World</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100vh;
+            touch-action: none;
+            outline: none;
+        }
+        
+        #scene {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            perspective: 1000px;
+        }
+        
+        .object-3d {
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease;
+        }
+        
+        .avatar {
+            width: 30px;
+            height: 60px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-radius: 15px 15px 5px 5px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .avatar.selected {
+            box-shadow: 0 0 20px yellow;
+        }
+        
+        .furniture {
+            background: #8B4513;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .chair {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+        }
+        
+        .table {
+            width: 60px;
+            height: 30px;
+            border-radius: 8px;
+        }
+        
+        .tree {
+            width: 30px;
+            height: 80px;
+            background: linear-gradient(to top, #8B4513 0%, #8B4513 30%, #228B22 30%);
+            border-radius: 15px 15px 50% 50%;
+        }
+        
+        .house {
+            width: 80px;
+            height: 60px;
+            background: #DEB887;
+            position: relative;
+        }
+        
+        .house:after {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 45px solid transparent;
+            border-right: 45px solid transparent;
+            border-bottom: 25px solid #8B4513;
+        }
+        
+        .ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(to bottom, #90EE90, #228B22);
+            transform: rotateX(90deg) translateZ(-100px);
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+        
+        .ui-overlay h3 {
+            margin: 0 0 10px 0;
+            color: #4ecdc4;
+        }
+        
+        .ui-overlay button {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            font-size: 14px;
+            touch-action: manipulation;
+            user-select: none;
+            min-height: 44px; /* iOS touch target minimum */
+        }
+        
+        .ui-overlay button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .ui-overlay button:active {
+            transform: translateY(0) scale(0.98);
+            background: linear-gradient(45deg, #3ca89f, #398071);
+        }
+
+        /* Bottom toolbar for mobile */
+        .bottom-toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 25px;
+            padding: 10px;
+            z-index: 1000;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toolbar-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            touch-action: manipulation;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar-btn:active {
+            transform: scale(0.95);
+            background: linear-gradient(45deg, #3ca89f, #398071);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        
+        .gizmo {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: yellow;
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: grab;
+            display: none;
+        }
+        
+        .gizmo.active {
+            display: block;
+        }
+        
+        .gizmo:active {
+            cursor: grabbing;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .ui-overlay {
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                top: auto;
+                max-width: none;
+                padding: 10px;
+            }
+            
+            .ui-overlay h3 {
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+            
+            .ui-overlay button {
+                padding: 14px;
+                font-size: 16px;
+                margin: 3px 0;
+            }
+            
+            .controls {
+                font-size: 11px;
+                margin-top: 10px;
+            }
+            
+            .info-panel {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                background: rgba(0, 0, 0, 0.9);
+                font-size: 11px;
+                padding: 8px;
+                text-align: center;
+            }
+            
+            .avatar, .furniture {
+                /* Larger touch targets on mobile */
+                min-width: 40px;
+                min-height: 40px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .ui-overlay {
+                padding: 8px;
+            }
+            
+            .ui-overlay button {
+                padding: 16px;
+                font-size: 18px;
+            }
+            
+            .controls {
+                font-size: 10px;
+            }
+        }
+        
+        /* Virtual controls for mobile */
+        .virtual-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .virtual-dpad {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .dpad-btn {
+            background: rgba(78, 205, 196, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+        }
+        
+        .dpad-btn:active {
+            background: rgba(78, 205, 196, 1);
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .dpad-up { grid-column: 2; grid-row: 1; }
+        .dpad-left { grid-column: 1; grid-row: 2; }
+        .dpad-center { 
+            grid-column: 2; 
+            grid-row: 2; 
+            background: rgba(255, 107, 107, 0.8);
+            font-size: 20px;
+        }
+        .dpad-center:active { 
+            background: rgba(255, 107, 107, 1); 
+        }
+        .dpad-right { grid-column: 3; grid-row: 2; }
+        .dpad-down { grid-column: 2; grid-row: 3; }
+        
+        /* Show virtual controls on mobile */
+        @media (max-width: 768px) {
+            .virtual-controls {
+                display: block;
+            }
+            
+            .bottom-toolbar {
+                display: flex;
+            }
+            
+            .ui-overlay {
+                display: none; /* Hide desktop UI on mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="scene">
+        <div class="ground"></div>
+        <div id="gizmo" class="gizmo"></div>
+    </div>
+    
+    <!-- Virtual controls for mobile -->
+    <div id="virtualControls" class="virtual-controls">
+        <div class="virtual-dpad">
+            <button class="dpad-btn dpad-up" data-key="w">↑</button>
+            <button class="dpad-btn dpad-left" data-key="a">←</button>
+            <button class="dpad-btn dpad-center" data-key=" ">⚡</button>
+            <button class="dpad-btn dpad-right" data-key="d">→</button>
+            <button class="dpad-btn dpad-down" data-key="s">↓</button>
+        </div>
+    </div>
+    
+    <!-- Bottom toolbar for mobile -->
+    <div id="bottomToolbar" class="bottom-toolbar">
+        <button class="toolbar-btn" id="spawnAvatarMobile" title="Spawn Avatar">👤</button>
+        <button class="toolbar-btn" id="toggleGizmosMobile" title="Toggle Gizmos">🔧</button>
+        <button class="toolbar-btn" id="loadAssetMobile" title="Load Asset">🪑</button>
+        <button class="toolbar-btn" id="clearSceneMobile" title="Clear Scene">🗑️</button>
+    </div>
+    
+    <div class="ui-overlay">
+        <h3>🌟 Vibe Avatars</h3>
+        <button id="spawnAvatar">👤 Spawn Avatar</button>
+        <button id="toggleGizmos">🔧 Toggle Gizmos</button>
+        <button id="loadAsset">🪑 Load Asset</button>
+        <button id="clearScene">🗑️ Clear Scene</button>
+        
+        <div class="controls">
+            <div><strong>Controls:</strong></div>
+            <div>• Click/Tap: Select objects</div>
+            <div>• Drag: Move objects</div>
+            <div>• WASD: Move avatar</div>
+            <div>• Space: Jump avatar</div>
+            <div><strong>Touch Controls:</strong></div>
+            <div>• Tap: Select avatar/object</div>
+            <div>• Drag: Move selected avatar</div>
+            <div>• Two fingers: Jump avatar</div>
+            <div>• Virtual D-pad: Move avatar</div>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div><strong>Vibe Avatars Demo</strong></div>
+        <div>Avatars: <span id="avatarCount">0</span></div>
+        <div>Objects: <span id="objectCount">0</span></div>
+        <div>Selected: <span id="selectedInfo">None</span></div>
+    </div>
+
+    <script type="module" src="js/demo-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibe Avatars - 3D World with Babylon.js</title>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/havok/HavokPhysics_umd.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+        }
+        
+        #renderCanvas {
+            width: 100%;
+            height: 100vh;
+            touch-action: none;
+            outline: none;
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+        
+        .ui-overlay h3 {
+            margin: 0 0 10px 0;
+            color: #4ecdc4;
+        }
+        
+        .ui-overlay button {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+            font-size: 14px;
+            touch-action: manipulation;
+            user-select: none;
+            min-height: 44px;
+        }
+        
+        .ui-overlay button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .ui-overlay button:active {
+            transform: translateY(0) scale(0.98);
+            background: linear-gradient(45deg, #3ca89f, #398071);
+        }
+
+        /* Bottom toolbar for mobile */
+        .bottom-toolbar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 25px;
+            padding: 10px;
+            z-index: 1000;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toolbar-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            touch-action: manipulation;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar-btn:active {
+            transform: scale(0.95);
+            background: linear-gradient(45deg, #3ca89f, #398071);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        
+        /* Virtual controls for mobile */
+        .virtual-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .virtual-dpad {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        
+        .dpad-btn {
+            background: rgba(78, 205, 196, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s ease;
+        }
+        
+        .dpad-btn:active {
+            background: rgba(78, 205, 196, 1);
+            transform: scale(0.95);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .dpad-up { grid-column: 2; grid-row: 1; }
+        .dpad-left { grid-column: 1; grid-row: 2; }
+        .dpad-center { 
+            grid-column: 2; 
+            grid-row: 2; 
+            background: rgba(255, 107, 107, 0.8);
+            font-size: 20px;
+        }
+        .dpad-center:active { 
+            background: rgba(255, 107, 107, 1); 
+        }
+        .dpad-right { grid-column: 3; grid-row: 2; }
+        .dpad-down { grid-column: 2; grid-row: 3; }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .virtual-controls {
+                display: block;
+            }
+            
+            .bottom-toolbar {
+                display: flex;
+            }
+            
+            .ui-overlay {
+                display: none;
+            }
+            
+            .info-panel {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                background: rgba(0, 0, 0, 0.9);
+                font-size: 11px;
+                padding: 8px;
+                text-align: center;
+            }
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderCanvas"></canvas>
+    
+    <div id="loading">Loading 3D World...</div>
+    
+    <!-- Virtual controls for mobile -->
+    <div id="virtualControls" class="virtual-controls">
+        <div class="virtual-dpad">
+            <button class="dpad-btn dpad-up" data-key="w">↑</button>
+            <button class="dpad-btn dpad-left" data-key="a">←</button>
+            <button class="dpad-btn dpad-center" data-key=" ">⚡</button>
+            <button class="dpad-btn dpad-right" data-key="d">→</button>
+            <button class="dpad-btn dpad-down" data-key="s">↓</button>
+        </div>
+    </div>
+    
+    <!-- Bottom toolbar for mobile -->
+    <div id="bottomToolbar" class="bottom-toolbar">
+        <button class="toolbar-btn" id="spawnAvatarMobile" title="Spawn Avatar">👤</button>
+        <button class="toolbar-btn" id="toggleGizmosMobile" title="Toggle Gizmos">🔧</button>
+        <button class="toolbar-btn" id="loadAssetMobile" title="Load Asset">🪑</button>
+        <button class="toolbar-btn" id="clearSceneMobile" title="Clear Scene">🗑️</button>
+    </div>
+    
+    <div class="ui-overlay">
+        <h3>🌟 Vibe Avatars 3D</h3>
+        <button id="spawnAvatar">👤 Spawn HVGirl Avatar</button>
+        <button id="toggleGizmos">🔧 Toggle Gizmos</button>
+        <button id="loadAsset">🪑 Load Asset</button>
+        <button id="clearScene">🗑️ Clear Scene</button>
+        
+        <div class="controls">
+            <div><strong>3D Controls:</strong></div>
+            <div>• Mouse: Rotate camera</div>
+            <div>• Wheel: Zoom camera</div>
+            <div>• Click: Select objects</div>
+            <div>• WASD: Move avatar</div>
+            <div>• Space: Jump avatar</div>
+            <div><strong>Physics:</strong></div>
+            <div>• Physics V2 enabled</div>
+            <div>• Realistic collisions</div>
+            <div>• HVGirl avatar model</div>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div><strong>Vibe Avatars 3D Demo</strong></div>
+        <div>Engine: Babylon.js + Physics V2</div>
+        <div>Avatars: <span id="avatarCount">0</span></div>
+        <div>Objects: <span id="objectCount">0</span></div>
+        <div>Selected: <span id="selectedInfo">None</span></div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
