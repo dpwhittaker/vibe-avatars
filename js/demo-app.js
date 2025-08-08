@@ -8,6 +8,8 @@ class VibeAvatarsDemo {
         this.selectedAvatar = null;
         this.isDragging = false;
         this.dragOffset = { x: 0, y: 0 };
+        this.touchMovementActive = false;
+        this.keys = {}; // For virtual controls
         
         this.init();
     }
@@ -42,8 +44,18 @@ class VibeAvatarsDemo {
         this.scene.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.scene.addEventListener('mouseup', (e) => this.onMouseUp(e));
         
-        // Prevent context menu
+        // Touch events for mobile support
+        this.scene.addEventListener('touchstart', (e) => this.onTouchStart(e));
+        this.scene.addEventListener('touchmove', (e) => this.onTouchMove(e));
+        this.scene.addEventListener('touchend', (e) => this.onTouchEnd(e));
+        
+        // Virtual controls
+        this.setupVirtualControls();
+        
+        // Prevent context menu and default touch behaviors
         this.scene.addEventListener('contextmenu', (e) => e.preventDefault());
+        this.scene.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+        this.scene.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
     }
 
     setupKeyboardControls() {
@@ -58,12 +70,53 @@ class VibeAvatarsDemo {
             keys[e.key.toLowerCase()] = false;
         });
 
+        // Store keys reference for virtual controls
+        this.keys = keys;
+
         // Movement loop
         setInterval(() => {
             if (this.selectedAvatar) {
                 this.updateAvatarMovement(keys);
             }
         }, 16); // ~60fps
+    }
+
+    setupVirtualControls() {
+        const dpadButtons = document.querySelectorAll('.dpad-btn');
+        
+        dpadButtons.forEach(button => {
+            const key = button.getAttribute('data-key');
+            
+            // Handle touch events for virtual buttons
+            button.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.keys[key] = true;
+                this.handleKeyPress(key);
+                button.style.background = button.classList.contains('dpad-center') 
+                    ? 'rgba(255, 107, 107, 1)' 
+                    : 'rgba(78, 205, 196, 1)';
+            });
+            
+            button.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.keys[key] = false;
+                button.style.background = button.classList.contains('dpad-center') 
+                    ? 'rgba(255, 107, 107, 0.8)' 
+                    : 'rgba(78, 205, 196, 0.8)';
+            });
+            
+            // Also handle mouse events for testing on desktop
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                this.keys[key] = true;
+                this.handleKeyPress(key);
+            });
+            
+            button.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                this.keys[key] = false;
+            });
+        });
     }
 
     handleKeyPress(key) {
@@ -135,6 +188,95 @@ class VibeAvatarsDemo {
 
     onMouseUp(e) {
         this.isDragging = false;
+    }
+
+    // Touch event handlers for mobile support
+    onTouchStart(e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (target && target.classList.contains('object-3d')) {
+                this.selectObject(target);
+                
+                if (this.gizmosEnabled) {
+                    this.startTouchDragging(touch, target);
+                }
+            } else if (target === this.scene || target.classList.contains('ground')) {
+                this.selectObject(null);
+            }
+        } else if (e.touches.length === 2) {
+            // Two-finger touch for avatar movement
+            this.setupTouchMovement(e.touches);
+        }
+    }
+
+    onTouchMove(e) {
+        if (e.touches.length === 1 && this.isDragging && this.selectedObject) {
+            const touch = e.touches[0];
+            const newX = touch.clientX - this.dragOffset.x;
+            const newY = touch.clientY - this.dragOffset.y;
+            
+            // Keep object in bounds
+            const maxX = this.scene.offsetWidth - this.selectedObject.offsetWidth;
+            const maxY = this.scene.offsetHeight - this.selectedObject.offsetHeight - 50;
+            
+            this.selectedObject.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
+            this.selectedObject.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
+        } else if (e.touches.length === 1 && this.selectedAvatar && !this.isDragging) {
+            // Single finger drag to move selected avatar
+            this.moveAvatarToTouch(e.touches[0]);
+        }
+    }
+
+    onTouchEnd(e) {
+        this.isDragging = false;
+        this.touchMovementActive = false;
+    }
+
+    startTouchDragging(touch, object) {
+        this.isDragging = true;
+        const rect = object.getBoundingClientRect();
+        this.dragOffset.x = touch.clientX - rect.left;
+        this.dragOffset.y = touch.clientY - rect.top;
+    }
+
+    setupTouchMovement(touches) {
+        // Use two-finger gestures for special actions
+        this.touchMovementActive = true;
+        if (this.selectedAvatar) {
+            // Jump animation on two-finger tap
+            this.animateJump(this.selectedAvatar);
+        }
+    }
+
+    moveAvatarToTouch(touch) {
+        if (!this.selectedAvatar) return;
+
+        const sceneRect = this.scene.getBoundingClientRect();
+        const targetX = touch.clientX - sceneRect.left - this.selectedAvatar.offsetWidth / 2;
+        const targetY = touch.clientY - sceneRect.top - this.selectedAvatar.offsetHeight / 2;
+
+        // Smooth movement towards touch point
+        const currentX = this.selectedAvatar.offsetLeft;
+        const currentY = this.selectedAvatar.offsetTop;
+        
+        const deltaX = targetX - currentX;
+        const deltaY = targetY - currentY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance > 5) { // Minimum movement threshold
+            const speed = Math.min(3, distance / 10); // Adaptive speed
+            const newX = currentX + (deltaX / distance) * speed;
+            const newY = currentY + (deltaY / distance) * speed;
+            
+            // Keep avatar in bounds
+            const maxX = this.scene.offsetWidth - this.selectedAvatar.offsetWidth;
+            const maxY = this.scene.offsetHeight - this.selectedAvatar.offsetHeight - 50;
+            
+            this.selectedAvatar.style.left = Math.max(0, Math.min(newX, maxX)) + 'px';
+            this.selectedAvatar.style.top = Math.max(0, Math.min(newY, maxY)) + 'px';
+        }
     }
 
     startDragging(e, object) {
