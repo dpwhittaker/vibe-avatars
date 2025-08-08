@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibe Avatars - 3D World</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(to bottom, #87CEEB, #98FB98);
+        }
+        
+        #scene {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            perspective: 1000px;
+        }
+        
+        .object-3d {
+            position: absolute;
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease;
+        }
+        
+        .avatar {
+            width: 30px;
+            height: 60px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-radius: 15px 15px 5px 5px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .avatar.selected {
+            box-shadow: 0 0 20px yellow;
+        }
+        
+        .furniture {
+            background: #8B4513;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .chair {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+        }
+        
+        .table {
+            width: 60px;
+            height: 30px;
+            border-radius: 8px;
+        }
+        
+        .tree {
+            width: 30px;
+            height: 80px;
+            background: linear-gradient(to top, #8B4513 0%, #8B4513 30%, #228B22 30%);
+            border-radius: 15px 15px 50% 50%;
+        }
+        
+        .house {
+            width: 80px;
+            height: 60px;
+            background: #DEB887;
+            position: relative;
+        }
+        
+        .house:after {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: -5px;
+            width: 0;
+            height: 0;
+            border-left: 45px solid transparent;
+            border-right: 45px solid transparent;
+            border-bottom: 25px solid #8B4513;
+        }
+        
+        .ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(to bottom, #90EE90, #228B22);
+            transform: rotateX(90deg) translateZ(-100px);
+        }
+        
+        .ui-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+        
+        .ui-overlay h3 {
+            margin: 0 0 10px 0;
+            color: #4ecdc4;
+        }
+        
+        .ui-overlay button {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+        
+        .ui-overlay button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .ui-overlay button:active {
+            transform: translateY(0);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #ccc;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        
+        .gizmo {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: yellow;
+            border: 2px solid #333;
+            border-radius: 50%;
+            cursor: grab;
+            display: none;
+        }
+        
+        .gizmo.active {
+            display: block;
+        }
+        
+        .gizmo:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+    <div id="scene">
+        <div class="ground"></div>
+        <div id="gizmo" class="gizmo"></div>
+    </div>
+    
+    <div class="ui-overlay">
+        <h3>🌟 Vibe Avatars</h3>
+        <button id="spawnAvatar">👤 Spawn Avatar</button>
+        <button id="toggleGizmos">🔧 Toggle Gizmos</button>
+        <button id="loadAsset">🪑 Load Asset</button>
+        <button id="clearScene">🗑️ Clear Scene</button>
+        
+        <div class="controls">
+            <div><strong>Controls:</strong></div>
+            <div>• Click: Select objects</div>
+            <div>• Drag: Move objects</div>
+            <div>• WASD: Move avatar</div>
+            <div>• Space: Jump avatar</div>
+        </div>
+    </div>
+    
+    <div class="info-panel">
+        <div><strong>Vibe Avatars Demo</strong></div>
+        <div>Avatars: <span id="avatarCount">0</span></div>
+        <div>Objects: <span id="objectCount">0</span></div>
+        <div>Selected: <span id="selectedInfo">None</span></div>
+    </div>
+
+    <script src="js/demo-app.js"></script>
+</body>
+</html>
